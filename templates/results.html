@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wyniki Porównania</title>
+    <style>
+        body { font-family: sans-serif; max-width: 1200px; margin: 40px auto; padding: 20px; line-height: 1.6; background-color: #f8f9fa; color: #212529; }
+        h1, h2 { text-align: center; color: #343a40; }
+        .container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .summary-table { width: 50%; margin: 20px auto; border-collapse: collapse; }
+        .summary-table td { padding: 12px; border: 1px solid #dee2e6; }
+        .summary-table td:first-child { font-weight: bold; background-color: #f1f3f5; }
+        .actions { text-align: center; margin: 30px 0; }
+        .btn { display: inline-block; padding: 12px 24px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px; font-size: 16px; margin: 0 10px; }
+        .btn-back { background-color: #6c757d; }
+        .results-table { width: 100%; margin-top: 30px; border-collapse: collapse; font-size: 14px; }
+        .results-table th, .results-table td { padding: 10px; border: 1px solid #dee2e6; text-align: left; }
+        .results-table th { background-color: #e9ecef; }
+        .results-table tr:nth-child(even) { background-color: #f8f9fa; }
+        .no-diff { text-align: center; color: #6c757d; font-style: italic; margin-top: 20px;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Wyniki Porównania Feedów</h1>
+
+        <h2>Podsumowanie</h2>
+        <table class="summary-table">
+            <tr>
+                <td>Produkty w Feed 1</td>
+                <td>{{ results['total_feed1'] }}</td>
+            </tr>
+            <tr>
+                <td>Produkty w Feed 2</td>
+                <td>{{ results['total_feed2'] }}</td>
+            </tr>
+            <tr>
+                <td>Produkty wspólne</td>
+                <td>{{ results['common_total'] }}</td>
+            </tr>
+            <tr>
+                <td>Produkty tylko w Feed 1</td>
+                <td>{{ results['only_in_feed1'] | length }}</td>
+            </tr>
+             <tr>
+                <td>Produkty tylko w Feed 2</td>
+                <td>{{ results['only_in_feed2'] | length }}</td>
+            </tr>
+            <tr>
+                <td>Produkty z różnicami</td>
+                <td>{{ results['diff_products_total'] }}</td>
+            </tr>
+        </table>
+        
+        <div class="actions">
+            <a href="/download_excel?feed1={{ feed1_url }}&feed2={{ feed2_url }}" class="btn">Pobierz raport Excel</a>
+            <a href="/" class="btn btn-back">Wróć i porównaj inne</a>
+        </div>
+
+        <h2>Szczegółowe Różnice</h2>
+        {% if results['differences'] %}
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>ID Produktu</th>
+                        <th>Pole</th>
+                        <th>Wartość w Feed 1</th>
+                        <th>Wartość w Feed 2</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for diff in results['differences'] %}
+                    <tr>
+                        <td>{{ diff['Product ID'] }}</td>
+                        <td>{{ diff['Pole'] }}</td>
+                        <td>{{ diff['Wartość Feed 1'] }}</td>
+                        <td>{{ diff['Wartość Feed 2'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="no-diff">Brak różnic w polach wspólnych produktów.</p>
+        {% endif %}
+    </div>
+</body>
+</html>
