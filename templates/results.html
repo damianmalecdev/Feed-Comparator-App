@@ -5,20 +5,93 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wyniki Porównania</title>
     <style>
-        body { font-family: sans-serif; max-width: 1200px; margin: 40px auto; padding: 20px; line-height: 1.6; background-color: #f8f9fa; color: #212529; }
-        h1, h2 { text-align: center; color: #343a40; }
-        .container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .summary-table { width: 50%; margin: 20px auto; border-collapse: collapse; }
-        .summary-table td { padding: 12px; border: 1px solid #dee2e6; }
-        .summary-table td:first-child { font-weight: bold; background-color: #f1f3f5; }
-        .actions { text-align: center; margin: 30px 0; }
-        .btn { display: inline-block; padding: 12px 24px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px; font-size: 16px; margin: 0 10px; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            max-width: 1200px; 
+            margin: 40px auto; 
+            padding: 20px; 
+            line-height: 1.6; 
+            background-color: #f8f9fa; 
+            color: #212529; 
+        }
+        h1, h2 { 
+            text-align: center; 
+            color: #343a40; 
+            border-bottom: 2px solid #dee2e6;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        .container { 
+            background-color: #fff; 
+            padding: 30px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05); 
+        }
+        .summary-table { 
+            width: 60%; 
+            margin: 20px auto; 
+            border-collapse: collapse; 
+        }
+        .summary-table td { 
+            padding: 12px 15px; 
+            border: 1px solid #dee2e6; 
+        }
+        .summary-table td:first-child { 
+            font-weight: bold; 
+            background-color: #f1f3f5;
+            width: 40%;
+        }
+        .actions { 
+            text-align: center; 
+            margin: 40px 0; 
+        }
+        .btn { 
+            display: inline-block; 
+            padding: 12px 24px; 
+            color: white; 
+            text-decoration: none; 
+            border-radius: 5px; 
+            font-size: 16px; 
+            margin: 0 10px;
+            transition: background-color 0.2s ease-in-out;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-download { background-color: #28a745; }
+        .btn-download:hover { background-color: #218838; }
         .btn-back { background-color: #6c757d; }
-        .results-table { width: 100%; margin-top: 30px; border-collapse: collapse; font-size: 14px; }
-        .results-table th, .results-table td { padding: 10px; border: 1px solid #dee2e6; text-align: left; }
-        .results-table th { background-color: #e9ecef; }
-        .results-table tr:nth-child(even) { background-color: #f8f9fa; }
-        .no-diff { text-align: center; color: #6c757d; font-style: italic; margin-top: 20px;}
+        .btn-back:hover { background-color: #5a6268; }
+
+        .results-table { 
+            width: 100%; 
+            margin-top: 30px; 
+            border-collapse: collapse; 
+            font-size: 14px;
+            table-layout: fixed; 
+        }
+        .results-table th, .results-table td { 
+            padding: 12px 15px; 
+            border: 1px solid #dee2e6; 
+            text-align: left;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        .results-table th { 
+            background-color: #e9ecef; 
+        }
+        .results-table tbody tr:hover { 
+            background-color: #f1f3f5;
+        }
+        .results-table th:nth-child(1) { width: 15%; }
+        .results-table th:nth-child(2) { width: 20%; }
+        .results-table th:nth-child(3) { width: 32.5%; }
+        .results-table th:nth-child(4) { width: 32.5%; }
+        .no-diff { 
+            text-align: center; 
+            color: #6c757d; 
+            font-style: italic; 
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
@@ -54,7 +127,7 @@
         </table>
         
         <div class="actions">
-            <a href="/download_excel?feed1={{ feed1_url }}&feed2={{ feed2_url }}" class="btn">Pobierz raport Excel</a>
+            <a href="/download_excel?feed1={{ feed1_url }}&feed2={{ feed2_url }}" class="btn btn-download">Pobierz raport Excel</a>
             <a href="/" class="btn btn-back">Wróć i porównaj inne</a>
         </div>
 
