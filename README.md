@@ -142,8 +142,8 @@ python3 -c "import secrets; print('SECRET_KEY=' + secrets.token_hex(32))" >> .en
 # Edytuj .env i dostosuj do swoich potrzeb
 nano .env
 
-# WAŻNE: Ustaw właściciela plików na ubuntu
-sudo chown -R ubuntu:ubuntu /www/wwwroot/s1.malec.in
+# WAŻNE: Ustaw właściciela plików na www
+sudo chown -R www:www /www/wwwroot/s1.malec.in
 
 # Ustaw odpowiednie uprawnienia
 sudo chmod 640 .env  # .env nie powinien być czytelny dla innych
@@ -309,7 +309,7 @@ python3 -c "import secrets; print('SECRET_KEY=' + secrets.token_hex(32))" >> .en
 nano .env
 
 # Ustaw właściciela
-sudo chown ubuntu:ubuntu .env
+sudo chown www:www .env
 sudo chmod 640 .env
 
 # Uruchom usługę
