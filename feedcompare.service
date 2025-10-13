@@ -1,0 +1,17 @@
+[Unit]
+Description=s1.malec.in Gunicorn Service
+After=network.target
+
+[Service]
+User=root
+Group=www-data
+WorkingDirectory=/www/wwwroot/s1.malec.in
+Environment="PATH=/www/wwwroot/s1.malec.in/venv/bin"
+ExecStart=/www/wwwroot/s1.malec.in/venv/bin/python3 -m gunicorn --workers 3 --bind 0.0.0.0:8010 app:app
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target
+
