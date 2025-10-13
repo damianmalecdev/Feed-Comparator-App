@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wybierz atrybuty do wykluczenia</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            max-width: 900px; 
+            margin: 40px auto; 
+            padding: 20px; 
+            line-height: 1.6; 
+            background-color: #f8f9fa; 
+            color: #212529; 
+        }
+        h1 { 
+            text-align: center; 
+            color: #343a40; 
+            border-bottom: 2px solid #dee2e6;
+            padding-bottom: 10px;
+            margin-bottom: 25px;
+        }
+        .container { 
+            background-color: #fff; 
+            padding: 30px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05); 
+        }
+        .info-box {
+            background-color: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 4px;
+        }
+        .info-box p {
+            margin: 5px 0;
+            color: #1976D2;
+            font-weight: 500;
+        }
+        .description {
+            color: #6c757d;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .controls {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .toggle-btn {
+            padding: 10px 18px;
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .toggle-btn:hover {
+            background-color: #5a6268;
+        }
+        .toggle-btn:active {
+            transform: scale(0.98);
+        }
+        .attributes-list {
+            max-height: 450px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 25px;
+            background-color: #fafafa;
+        }
+        .attributes-list::-webkit-scrollbar {
+            width: 10px;
+        }
+        .attributes-list::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        .attributes-list::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        .attributes-list::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        .attribute-item {
+            padding: 10px;
+            margin-bottom: 8px;
+            background-color: white;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+            transition: background-color 0.2s;
+        }
+        .attribute-item:hover {
+            background-color: #f1f3f5;
+        }
+        .attribute-item label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-weight: normal;
+        }
+        .attribute-item input[type="checkbox"] {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        .actions {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 25px;
+        }
+        .btn {
+            padding: 12px 30px;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: background-color 0.2s, transform 0.1s;
+            font-weight: 500;
+        }
+        .btn:active {
+            transform: scale(0.98);
+        }
+        .btn-primary {
+            background-color: #007bff;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+        .selected-count {
+            font-weight: bold;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Wybierz atrybuty do wykluczenia</h1>
+        
+        <div class="info-box">
+            <p>📊 Feed 1: {{ feed_info.total_feed1 }} produktów</p>
+            <p>📊 Feed 2: {{ feed_info.total_feed2 }} produktów</p>
+            <p>🏷️ Znaleziono {{ attributes|length }} unikalnych atrybutów w pierwszym produkcie</p>
+        </div>
+        
+        <p class="description">
+            Wybierz atrybuty, które chcesz wykluczyć z porównania. Zaznaczone atrybuty nie będą uwzględniane w wynikach.
+        </p>
+        
+        <form action="/compare" method="post" id="compareForm">
+            <input type="hidden" name="feed1" value="{{ feed1_url }}">
+            <input type="hidden" name="feed2" value="{{ feed2_url }}">
+            
+            <div class="controls">
+                <button type="button" class="toggle-btn" onclick="toggleAll()">Zaznacz/Odznacz wszystkie</button>
+                <span>Wybrano: <span class="selected-count" id="selectedCount">0</span> atrybutów</span>
+            </div>
+            
+            <div class="attributes-list">
+                {% for attribute in attributes %}
+                <div class="attribute-item">
+                    <label>
+                        <input type="checkbox" 
+                               name="excluded_attributes" 
+                               value="{{ attribute }}"
+                               onchange="updateCount()">
+                        <span>{{ attribute }}</span>
+                    </label>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div class="actions">
+                <button type="submit" class="btn btn-primary">Porównaj z wybranymi wykluczeniami</button>
+                <a href="/" class="btn btn-secondary">Wróć</a>
+            </div>
+        </form>
+    </div>
+    
+    <script>
+        function toggleAll() {
+            const checkboxes = document.querySelectorAll('input[name="excluded_attributes"]');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            
+            checkboxes.forEach(cb => {
+                cb.checked = !allChecked;
+            });
+            
+            updateCount();
+        }
+        
+        function updateCount() {
+            const checked = document.querySelectorAll('input[name="excluded_attributes"]:checked').length;
+            document.getElementById('selectedCount').textContent = checked;
+        }
+        
+        // Inicjalizacja licznika przy załadowaniu strony
+        document.addEventListener('DOMContentLoaded', updateCount);
+    </script>
+</body>
+</html>
+

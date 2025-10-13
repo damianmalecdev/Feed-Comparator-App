@@ -14,12 +14,20 @@
             background-color: #f8f9fa; 
             color: #212529; 
         }
-        h1, h2 { 
+        h1 { 
             text-align: center; 
             color: #343a40; 
             border-bottom: 2px solid #dee2e6;
             padding-bottom: 10px;
-            margin-bottom: 30px;
+            margin-bottom: 25px;
+        }
+        h2 { 
+            text-align: center; 
+            color: #495057; 
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 8px;
+            margin: 35px 0 25px 0;
+            font-size: 1.5rem;
         }
         .container { 
             background-color: #fff; 
@@ -47,24 +55,47 @@
         }
         .btn { 
             display: inline-block; 
-            padding: 12px 24px; 
+            padding: 12px 30px; 
             color: white; 
             text-decoration: none; 
             border-radius: 5px; 
             font-size: 16px; 
             margin: 0 10px;
-            transition: background-color 0.2s ease-in-out;
+            transition: background-color 0.2s, transform 0.1s;
             border: none;
             cursor: pointer;
+            font-weight: 500;
+        }
+        .btn:active {
+            transform: scale(0.98);
         }
         .btn-download { background-color: #28a745; }
         .btn-download:hover { background-color: #218838; }
         .btn-back { background-color: #6c757d; }
         .btn-back:hover { background-color: #5a6268; }
 
+        .table-wrapper {
+            max-height: 600px;
+            overflow-y: auto;
+            margin-top: 20px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+        .table-wrapper::-webkit-scrollbar {
+            width: 10px;
+        }
+        .table-wrapper::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .table-wrapper::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        .table-wrapper::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
         .results-table { 
             width: 100%; 
-            margin-top: 30px; 
             border-collapse: collapse; 
             font-size: 14px;
             table-layout: fixed; 
@@ -77,10 +108,17 @@
             overflow-wrap: break-word;
         }
         .results-table th { 
-            background-color: #e9ecef; 
+            background-color: #e9ecef;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            font-weight: 600;
         }
         .results-table tbody tr:hover { 
-            background-color: #f1f3f5;
+            background-color: #f8f9fa;
+        }
+        .results-table tbody tr {
+            transition: background-color 0.2s;
         }
         .results-table th:nth-child(1) { width: 15%; }
         .results-table th:nth-child(2) { width: 20%; }
@@ -91,6 +129,9 @@
             color: #6c757d; 
             font-style: italic; 
             margin-top: 20px;
+            padding: 30px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
         }
     </style>
 </head>
@@ -99,6 +140,21 @@
         <h1>Wyniki Porównania Feedów</h1>
 
         <h2>Podsumowanie</h2>
+        
+        {% if excluded_attributes and excluded_attributes|length > 0 %}
+        <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px auto; max-width: 60%; border-radius: 4px;">
+            <strong>ℹ️ Wykluczone atrybuty:</strong> {{ excluded_attributes|length }}
+            <details style="margin-top: 10px; cursor: pointer;">
+                <summary style="font-weight: bold; color: #856404;">Pokaż listę wykluczonych atrybutów</summary>
+                <ul style="margin-top: 10px; padding-left: 20px;">
+                    {% for attr in excluded_attributes %}
+                    <li>{{ attr }}</li>
+                    {% endfor %}
+                </ul>
+            </details>
+        </div>
+        {% endif %}
+        
         <table class="summary-table">
             <tr>
                 <td>Produkty w Feed 1</td>
@@ -131,28 +187,61 @@
             <a href="/" class="btn btn-back">Wróć i porównaj inne</a>
         </div>
 
+        {% if results['attribute_stats'] and results['attribute_stats']|length > 0 %}
+        <h2>Statystyki różnic per atrybut</h2>
+        <div style="max-width: 70%; margin: 20px auto;">
+            <div style="background-color: #f8f9fa; border-radius: 4px; padding: 20px; border: 1px solid #dee2e6;">
+                <p style="text-align: center; color: #6c757d; margin-bottom: 15px; font-size: 14px;">
+                    Poniżej znajduje się zestawienie liczby różnic dla każdego atrybutu (posortowane malejąco):
+                </p>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background-color: #e9ecef; border-bottom: 2px solid #dee2e6;">
+                            <th style="padding: 12px; text-align: left; font-weight: 600; width: 60%;">Nazwa atrybutu</th>
+                            <th style="padding: 12px; text-align: center; font-weight: 600; width: 20%;">Liczba różnic</th>
+                            <th style="padding: 12px; text-align: center; font-weight: 600; width: 20%;">Procent produktów</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stat in results['attribute_stats'] %}
+                        <tr style="border-bottom: 1px solid #dee2e6; {% if loop.index % 2 == 0 %}background-color: #ffffff;{% else %}background-color: #f8f9fa;{% endif %}">
+                            <td style="padding: 10px; font-family: 'Courier New', monospace; font-weight: 500;">{{ stat.attribute }}</td>
+                            <td style="padding: 10px; text-align: center; font-weight: bold; color: #dc3545;">{{ stat.count }}</td>
+                            <td style="padding: 10px; text-align: center; color: #6c757d;">
+                                {{ "%.1f"|format((stat.count / results['common_total'] * 100) if results['common_total'] > 0 else 0) }}%
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
         <h2>Szczegółowe Różnice</h2>
         {% if results['differences'] %}
-            <table class="results-table">
-                <thead>
-                    <tr>
-                        <th>ID Produktu</th>
-                        <th>Pole</th>
-                        <th>Wartość w Feed 1</th>
-                        <th>Wartość w Feed 2</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for diff in results['differences'] %}
-                    <tr>
-                        <td>{{ diff['Product ID'] }}</td>
-                        <td>{{ diff['Pole'] }}</td>
-                        <td>{{ diff['Wartość Feed 1'] }}</td>
-                        <td>{{ diff['Wartość Feed 2'] }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <div class="table-wrapper">
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th>ID Produktu</th>
+                            <th>Pole</th>
+                            <th>Wartość w Feed 1</th>
+                            <th>Wartość w Feed 2</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for diff in results['differences'] %}
+                        <tr>
+                            <td>{{ diff['Product ID'] }}</td>
+                            <td>{{ diff['Pole'] }}</td>
+                            <td>{{ diff['Wartość Feed 1'] }}</td>
+                            <td>{{ diff['Wartość Feed 2'] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         {% else %}
             <p class="no-diff">Brak różnic w polach wspólnych produktów.</p>
         {% endif %}

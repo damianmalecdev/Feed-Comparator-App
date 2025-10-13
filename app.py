@@ -57,7 +57,38 @@ class XMLFeedComparator:
             print(f"Błąd parsowania: {str(e)}")
             return {}
     
-    def compare_feeds(self):
+    def get_all_attributes(self):
+        """Pobiera wszystkie unikalne atrybuty z pierwszego produktu każdego feeda"""
+        content1 = self._get_xml_content(self.source1)
+        content2 = self._get_xml_content(self.source2)
+
+        if content1 is None or content2 is None:
+            return None, None
+
+        self.feed1_data = self.parse_xml_feed(content1)
+        self.feed2_data = self.parse_xml_feed(content2)
+        
+        all_attributes = set()
+        
+        # Pobierz atrybuty z pierwszego produktu z feed1
+        if self.feed1_data:
+            first_product = list(self.feed1_data.values())[0]
+            all_attributes.update(first_product.keys())
+        
+        # Pobierz atrybuty z pierwszego produktu z feed2
+        if self.feed2_data:
+            first_product = list(self.feed2_data.values())[0]
+            all_attributes.update(first_product.keys())
+        
+        return sorted(list(all_attributes)), {
+            'total_feed1': len(self.feed1_data),
+            'total_feed2': len(self.feed2_data)
+        }
+    
+    def compare_feeds(self, excluded_attributes=None):
+        if excluded_attributes is None:
+            excluded_attributes = []
+            
         content1 = self._get_xml_content(self.source1)
         content2 = self._get_xml_content(self.source2)
 
@@ -72,14 +103,27 @@ class XMLFeedComparator:
         common_products = set(self.feed1_data.keys()) & set(self.feed2_data.keys())
         
         products_with_differences = []
+        attribute_diff_count = {}  # Licznik różnic per atrybut
+        
         for product_id in common_products:
             prod1 = self.feed1_data[product_id]
             prod2 = self.feed2_data[product_id]
-            differences = self.find_differences(product_id, prod1, prod2)
+            differences = self.find_differences(product_id, prod1, prod2, excluded_attributes)
             if differences:
                 products_with_differences.extend(differences)
+                # Zlicz różnice per atrybut
+                for diff in differences:
+                    attr_name = diff['Pole']
+                    attribute_diff_count[attr_name] = attribute_diff_count.get(attr_name, 0) + 1
 
         sorted_differences = sorted(products_with_differences, key=lambda d: (d['Product ID'], d['Pole']))
+        
+        # Sortuj statystyki atrybutów według liczby różnic (malejąco)
+        attribute_stats = sorted(
+            [{'attribute': k, 'count': v} for k, v in attribute_diff_count.items()],
+            key=lambda x: x['count'],
+            reverse=True
+        )
 
         return {
             'only_in_feed1': sorted(list(only_in_feed1)), 
@@ -88,13 +132,24 @@ class XMLFeedComparator:
             'total_feed1': len(self.feed1_data),
             'total_feed2': len(self.feed2_data),
             'common_total': len(common_products),
-            'diff_products_total': len(set(d['Product ID'] for d in products_with_differences))
+            'diff_products_total': len(set(d['Product ID'] for d in products_with_differences)),
+            'attribute_stats': attribute_stats  # Dodane: statystyki per atrybut
         }
     
-    def find_differences(self, product_id, prod1, prod2):
+    def find_differences(self, product_id, prod1, prod2, excluded_attributes=None):
+        if excluded_attributes is None:
+            excluded_attributes = []
+            
         differences = []
         all_keys = set(prod1.keys()) | set(prod2.keys())
+        excluded_count = 0
+        
         for key in all_keys:
+            # Pomiń wykluczone atrybuty
+            if key in excluded_attributes:
+                excluded_count += 1
+                continue
+                
             val1 = prod1.get(key, '[BRAK]')
             val2 = prod2.get(key, '[BRAK]')
             if val1 != val2:
@@ -102,10 +157,14 @@ class XMLFeedComparator:
                     'Product ID': product_id, 'Pole': key, 'Wartość Feed 1': val1,
                     'Wartość Feed 2': val2
                 })
+        
+        if excluded_count > 0 and len(differences) > 0:
+            print(f"   Produkt {product_id}: znaleziono {len(differences)} różnic (pominięto {excluded_count} atrybutów)")
+        
         return differences
 
-    def generate_excel_report(self):
-        comparison_results = self.compare_feeds()
+    def generate_excel_report(self, excluded_attributes=None):
+        comparison_results = self.compare_feeds(excluded_attributes)
         if comparison_results is None:
             return None
 
@@ -123,6 +182,19 @@ class XMLFeedComparator:
                 ]
             }
             pd.DataFrame(summary_data).to_excel(writer, sheet_name='Podsumowanie', index=False)
+            
+            # Dodaj statystyki różnic per atrybut
+            if comparison_results.get('attribute_stats'):
+                attr_stats_data = []
+                for stat in comparison_results['attribute_stats']:
+                    percentage = (stat['count'] / comparison_results['common_total'] * 100) if comparison_results['common_total'] > 0 else 0
+                    attr_stats_data.append({
+                        'Atrybut': stat['attribute'],
+                        'Liczba różnic': stat['count'],
+                        'Procent produktów (%)': round(percentage, 1)
+                    })
+                df_attr_stats = pd.DataFrame(attr_stats_data)
+                df_attr_stats.to_excel(writer, sheet_name='Statystyki atrybutów', index=False)
             
             if comparison_results['only_in_feed1']:
                 pd.DataFrame({'Product ID': comparison_results['only_in_feed1']}).to_excel(writer, sheet_name='Tylko w Feed 1', index=False)
@@ -150,12 +222,12 @@ def index():
     last_feed2 = session.get('last_feed2', '')
     return render_template('index.html', last_feed1=last_feed1, last_feed2=last_feed2)
 
-@app.route('/compare', methods=['POST'])
-def compare():
+@app.route('/analyze', methods=['POST'])
+def analyze():
     feed1_url = request.form['feed1']
     feed2_url = request.form['feed2']
 
-    # 3. DODANE: Zapisujemy URL-e w sesji po ich pobraniu z formularza
+    # Zapisujemy URL-e w sesji
     session['last_feed1'] = feed1_url
     session['last_feed2'] = feed2_url
 
@@ -163,28 +235,72 @@ def compare():
         return render_template('index.html', error="Proszę podać oba adresy URL.")
     
     comparator = XMLFeedComparator(feed1_url, feed2_url)
-    results = comparator.compare_feeds()
+    attributes, feed_info = comparator.get_all_attributes()
+
+    if attributes is None or feed_info is None:
+        return render_template('index.html', error="Nie udało się przetworzyć plików. Sprawdź adresy URL i format XML.")
+
+    return render_template(
+        'select_attributes.html',
+        attributes=attributes,
+        feed_info=feed_info,
+        feed1_url=feed1_url,
+        feed2_url=feed2_url
+    )
+
+@app.route('/compare', methods=['POST'])
+def compare():
+    feed1_url = request.form['feed1']
+    feed2_url = request.form['feed2']
+    
+    # Pobierz wykluczone atrybuty z formularza (checkboxy)
+    excluded_attributes = request.form.getlist('excluded_attributes')
+    
+    print(f"🔍 Rozpoczynam porównanie:")
+    print(f"   Feed 1: {feed1_url}")
+    print(f"   Feed 2: {feed2_url}")
+    print(f"   Wykluczone atrybuty ({len(excluded_attributes)}): {excluded_attributes}")
+
+    # Zapisujemy URL-e w sesji po ich pobraniu z formularza
+    session['last_feed1'] = feed1_url
+    session['last_feed2'] = feed2_url
+    session['excluded_attributes'] = excluded_attributes
+
+    if not feed1_url or not feed2_url:
+        return render_template('index.html', error="Proszę podać oba adresy URL.")
+    
+    comparator = XMLFeedComparator(feed1_url, feed2_url)
+    results = comparator.compare_feeds(excluded_attributes)
 
     if results is None:
+        print("❌ Błąd: results jest None!")
         return render_template('index.html', error="Nie udało się przetworzyć plików. Sprawdź adresy URL i format XML.")
+
+    print(f"✅ Porównanie zakończone:")
+    print(f"   Produkty z różnicami: {results['diff_products_total']}")
+    print(f"   Liczba różnic: {len(results['differences'])}")
 
     return render_template(
         'results.html', 
         results=results,
         feed1_url=feed1_url,
-        feed2_url=feed2_url
+        feed2_url=feed2_url,
+        excluded_attributes=excluded_attributes
     )
 
 @app.route('/download_excel')
 def download_excel():
     feed1_url = request.args.get('feed1')
     feed2_url = request.args.get('feed2')
+    
+    # Pobierz wykluczone atrybuty z sesji
+    excluded_attributes = session.get('excluded_attributes', [])
 
     if not feed1_url or not feed2_url:
         return "Brak adresów URL do wygenerowania raportu.", 400
 
     comparator = XMLFeedComparator(feed1_url, feed2_url)
-    excel_buffer = comparator.generate_excel_report()
+    excel_buffer = comparator.generate_excel_report(excluded_attributes)
 
     if excel_buffer is None:
         return "Błąd podczas generowania pliku Excel.", 500
@@ -200,4 +316,4 @@ def download_excel():
     )
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5001)
