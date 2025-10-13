@@ -3,9 +3,9 @@ Description=s1.malec.in Gunicorn Service
 After=network.target
 
 [Service]
-# Security: Run as www-data user instead of root
-User=www-data
-Group=www-data
+# Security: Run as ubuntu user instead of root
+User=ubuntu
+Group=ubuntu
 
 # Working directory
 WorkingDirectory=/www/wwwroot/s1.malec.in
