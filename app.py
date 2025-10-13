@@ -1,12 +1,14 @@
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 import pandas as pd
 from datetime import datetime
 import os
 import requests
 import io
+from urllib.parse import urlparse
+import ipaddress
 
-# 1. DODANE: Importujemy 'session'
 from flask import Flask, render_template, request, send_file, session
+from config import Config
 
 # --- Klasa XMLFeedComparator (bez zmian) ---
 class XMLFeedComparator:
@@ -17,13 +19,96 @@ class XMLFeedComparator:
         self.feed1_data = {}
         self.feed2_data = {}
 
+    def _validate_url(self, url):
+        """
+        Validates URL to prevent SSRF attacks.
+        Returns tuple: (is_valid, error_message)
+        """
+        try:
+            parsed = urlparse(url)
+            
+            # Check protocol
+            if parsed.scheme not in ['http', 'https']:
+                return False, f"Invalid protocol: {parsed.scheme}. Only http/https allowed."
+            
+            # Check URL length
+            if len(url) > 2048:
+                return False, "URL too long (max 2048 characters)"
+            
+            # Check if hostname exists
+            if not parsed.hostname:
+                return False, "Invalid URL: no hostname found"
+            
+            # Check against allowed domains if configured
+            if Config.ALLOWED_DOMAINS:
+                hostname_allowed = False
+                for allowed_domain in Config.ALLOWED_DOMAINS:
+                    if parsed.hostname == allowed_domain or parsed.hostname.endswith('.' + allowed_domain):
+                        hostname_allowed = True
+                        break
+                
+                if not hostname_allowed:
+                    return False, f"Domain {parsed.hostname} not in allowed list"
+            
+            # Block private/local IP addresses
+            try:
+                # Try to resolve hostname to IP
+                ip = ipaddress.ip_address(parsed.hostname)
+                if ip.is_private or ip.is_loopback or ip.is_link_local:
+                    return False, f"Access to private/local IP addresses is forbidden"
+            except ValueError:
+                # Hostname is not an IP address, that's fine
+                pass
+            
+            # Block common local hostnames
+            blocked_hosts = ['localhost', '127.0.0.1', '0.0.0.0', '::1']
+            if parsed.hostname.lower() in blocked_hosts:
+                return False, f"Access to {parsed.hostname} is forbidden"
+            
+            return True, None
+            
+        except Exception as e:
+            return False, f"URL validation error: {str(e)}"
+
     def _get_xml_content(self, source):
         try:
             if source.startswith('http://') or source.startswith('https://'):
-                response = requests.get(source, timeout=30)
+                # Validate URL first
+                is_valid, error_msg = self._validate_url(source)
+                if not is_valid:
+                    print(f"URL validation failed: {error_msg}")
+                    return None
+                
+                # Fetch XML with configured timeout
+                response = requests.get(
+                    source, 
+                    timeout=Config.REQUEST_TIMEOUT,
+                    stream=True  # Stream to check size before loading
+                )
                 response.raise_for_status()
-                return response.content
+                
+                # Check content size
+                content_length = response.headers.get('content-length')
+                if content_length and int(content_length) > Config.MAX_XML_SIZE:
+                    print(f"XML file too large: {content_length} bytes (max: {Config.MAX_XML_SIZE})")
+                    return None
+                
+                # Read content with size limit
+                content = b''
+                for chunk in response.iter_content(chunk_size=8192):
+                    content += chunk
+                    if len(content) > Config.MAX_XML_SIZE:
+                        print(f"XML file exceeded size limit during download")
+                        return None
+                
+                return content
             elif os.path.exists(source):
+                # Check file size before reading
+                file_size = os.path.getsize(source)
+                if file_size > Config.MAX_XML_SIZE:
+                    print(f"XML file too large: {file_size} bytes (max: {Config.MAX_XML_SIZE})")
+                    return None
+                    
                 with open(source, 'rb') as f:
                     return f.read()
             else:
@@ -211,8 +296,12 @@ class XMLFeedComparator:
 
 # --- Aplikacja Flask ---
 app = Flask(__name__)
-# 2. DODANE: Klucz do obsługi sesji. Zmień ten tekst na dowolny inny, losowy.
-app.secret_key = 'bardzo-tajny-klucz-do-sesji-123'
+app.secret_key = Config.SECRET_KEY
+
+# Validate configuration and show warnings
+config_warnings = Config.validate()
+for warning in config_warnings:
+    print(f"⚠️  {warning}")
 
 # 3. ZMIENIONE: Funkcja index odczytuje dane z sesji
 @app.route('/')
@@ -316,4 +405,11 @@ def download_excel():
     )
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5001)
+    print(f"🚀 Starting Feed Comparator on port {Config.PORT}")
+    print(f"   Environment: {Config.FLASK_ENV}")
+    print(f"   Debug mode: {Config.DEBUG}")
+    if Config.ALLOWED_DOMAINS:
+        print(f"   Allowed domains: {', '.join(Config.ALLOWED_DOMAINS)}")
+    else:
+        print(f"   Allowed domains: ALL (not recommended for production)")
+    app.run(debug=Config.DEBUG, port=Config.PORT)

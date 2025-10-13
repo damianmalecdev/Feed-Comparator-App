@@ -3,14 +3,37 @@ Description=s1.malec.in Gunicorn Service
 After=network.target
 
 [Service]
-User=root
+# Security: Run as www-data user instead of root
+User=www-data
 Group=www-data
+
+# Working directory
 WorkingDirectory=/www/wwwroot/s1.malec.in
+
+# Environment variables
 Environment="PATH=/www/wwwroot/s1.malec.in/venv/bin"
+# IMPORTANT: Set SECRET_KEY environment variable or use .env file
+# Environment="SECRET_KEY=your-generated-secret-key-here"
+
+# Start command
 ExecStart=/www/wwwroot/s1.malec.in/venv/bin/python3 -m gunicorn --workers 3 --bind 0.0.0.0:8010 app:app
+
+# Restart policy
 Restart=always
 RestartSec=5
 TimeoutStopSec=20
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/www/wwwroot/s1.malec.in
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictNamespaces=true
 
 [Install]
 WantedBy=multi-user.target

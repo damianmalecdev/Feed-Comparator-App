@@ -38,7 +38,72 @@ pip install -r requirements.txt
 python3 app.py
 ```
 
-4. Otwórz w przeglądarce: `http://localhost:5001`
+4. **Skonfiguruj zmienne środowiskowe** (opcjonalnie dla lokalnego developmentu):
+```bash
+# Skopiuj przykładowy plik konfiguracji
+cp env.example .env
+
+# Edytuj .env i ustaw swoje wartości
+nano .env
+```
+
+5. Otwórz w przeglądarce: `http://localhost:5001`
+
+## Konfiguracja (.env)
+
+Aplikacja używa zmiennych środowiskowych do konfiguracji. Wszystkie ustawienia mają sensowne wartości domyślne, ale **dla produkcji MUSISZ** ustawić własne wartości.
+
+### Generowanie SECRET_KEY
+
+```bash
+# Wygeneruj bezpieczny klucz:
+python3 -c "import secrets; print(secrets.token_hex(32))"
+```
+
+### Plik .env (produkcja)
+
+Utwórz plik `.env` w głównym katalogu aplikacji:
+
+```env
+# REQUIRED: Secret key dla Flask sessions
+SECRET_KEY=twoj-wygenerowany-sekretny-klucz-tutaj
+
+# OPTIONAL: Whitelist dozwolonych domen (rozdzielone przecinkiem)
+# Pozostaw puste aby zezwolić na wszystkie domeny (nie zalecane dla produkcji)
+ALLOWED_DOMAINS=cropink.com,dataoctopus.io,trusted-domain.com
+
+# OPTIONAL: Maksymalny rozmiar pliku XML w bajtach (domyślnie: 10MB)
+MAX_XML_SIZE=10485760
+
+# OPTIONAL: Timeout dla żądań HTTP w sekundach (domyślnie: 30)
+REQUEST_TIMEOUT=30
+
+# OPTIONAL: Środowisko (development/production)
+FLASK_ENV=production
+
+# OPTIONAL: Tryb debug (False dla produkcji)
+DEBUG=False
+
+# OPTIONAL: Port aplikacji (domyślnie: 5001)
+PORT=5001
+```
+
+### Funkcje bezpieczeństwa
+
+Aplikacja zawiera następujące mechanizmy bezpieczeństwa:
+
+1. **Walidacja URL** - blokuje dostęp do:
+   - Prywatnych adresów IP (192.168.x.x, 10.x.x.x)
+   - Adresów lokalnych (localhost, 127.0.0.1)
+   - Nieprawidłowych protokołów (tylko http/https)
+
+2. **XXE Protection** - używa `defusedxml` do ochrony przed XML External Entity attacks
+
+3. **Limit rozmiaru** - sprawdza rozmiar pliku XML przed i podczas pobierania
+
+4. **Domain whitelisting** - opcjonalnie ogranicza dostęp tylko do zaufanych domen
+
+5. **Timeouty** - konfigurowane timeouty dla żądań HTTP
 
 ## Instalacja na serwerze (systemd)
 
@@ -60,9 +125,32 @@ source venv/bin/activate
 
 # Zainstaluj zależności
 pip install -r requirements.txt
+
+# Dezaktywuj środowisko
+deactivate
 ```
 
-### 2. Konfiguracja usługi systemd
+### 2. Konfiguracja środowiska
+
+```bash
+# Skopiuj przykładowy plik .env
+cp env.example .env
+
+# Wygeneruj SECRET_KEY
+python3 -c "import secrets; print('SECRET_KEY=' + secrets.token_hex(32))" >> .env
+
+# Edytuj .env i dostosuj do swoich potrzeb
+nano .env
+
+# WAŻNE: Ustaw właściciela plików na www-data
+sudo chown -R www-data:www-data /www/wwwroot/s1.malec.in
+
+# Ustaw odpowiednie uprawnienia
+sudo chmod 640 .env  # .env nie powinien być czytelny dla innych
+sudo chmod 755 /www/wwwroot/s1.malec.in
+```
+
+### 3. Konfiguracja usługi systemd
 
 ```bash
 # Skopiuj plik usługi
@@ -81,7 +169,7 @@ sudo systemctl enable feedcompare
 sudo systemctl status feedcompare
 ```
 
-### 3. Podstawowe komendy
+### 4. Podstawowe komendy
 
 ```bash
 # Start usługi
@@ -179,10 +267,53 @@ server {
 
 ```bash
 cd /www/wwwroot/s1.malec.in
+
+# Pobierz najnowsze zmiany
 git pull origin main
+
+# Aktywuj środowisko wirtualne
 source venv/bin/activate
-pip install -r requirements.txt
+
+# Zainstaluj/zaktualizuj zależności
+pip install -r requirements.txt --upgrade
+
+# Sprawdź czy .env zawiera wszystkie nowe zmienne
+# Porównaj z env.example
+diff .env env.example || true
+
+# Dezaktywuj środowisko
+deactivate
+
+# Restart usługi
 sudo systemctl restart feedcompare
+
+# Sprawdź logi
+sudo journalctl -u feedcompare -f
+```
+
+### Migracja z poprzedniej wersji
+
+Jeśli aktualizujesz z wersji bez pliku `.env`:
+
+```bash
+# Zatrzymaj usługę
+sudo systemctl stop feedcompare
+
+# Utwórz plik .env
+cp env.example .env
+
+# Wygeneruj SECRET_KEY
+python3 -c "import secrets; print('SECRET_KEY=' + secrets.token_hex(32))" >> .env
+
+# Edytuj .env
+nano .env
+
+# Ustaw właściciela
+sudo chown www-data:www-data .env
+sudo chmod 640 .env
+
+# Uruchom usługę
+sudo systemctl start feedcompare
 ```
 
 ## Autor
