@@ -18,6 +18,7 @@ class XMLFeedComparator:
         self.source2 = source2
         self.feed1_data = {}
         self.feed2_data = {}
+        self.last_error = None
 
     def _validate_url(self, url):
         """
@@ -77,6 +78,7 @@ class XMLFeedComparator:
                 is_valid, error_msg = self._validate_url(source)
                 if not is_valid:
                     print(f"URL validation failed: {error_msg}")
+                    self.last_error = f"Błąd walidacji URL: {error_msg}"
                     return None
                 
                 # Fetch XML with configured timeout
@@ -91,6 +93,7 @@ class XMLFeedComparator:
                 content_length = response.headers.get('content-length')
                 if content_length and int(content_length) > Config.MAX_XML_SIZE:
                     print(f"XML file too large: {content_length} bytes (max: {Config.MAX_XML_SIZE})")
+                    self.last_error = f"Plik XML jest za duży ({content_length} bajtów). Maksymalny rozmiar: {Config.MAX_XML_SIZE} bajtów."
                     return None
                 
                 # Read content with size limit
@@ -99,6 +102,7 @@ class XMLFeedComparator:
                     content += chunk
                     if len(content) > Config.MAX_XML_SIZE:
                         print(f"XML file exceeded size limit during download")
+                        self.last_error = f"Plik XML przekroczył limit rozmiaru podczas pobierania. Maksymalny rozmiar: {Config.MAX_XML_SIZE} bajtów."
                         return None
                 
                 return content
@@ -107,17 +111,33 @@ class XMLFeedComparator:
                 file_size = os.path.getsize(source)
                 if file_size > Config.MAX_XML_SIZE:
                     print(f"XML file too large: {file_size} bytes (max: {Config.MAX_XML_SIZE})")
+                    self.last_error = f"Plik XML jest za duży ({file_size} bajtów). Maksymalny rozmiar: {Config.MAX_XML_SIZE} bajtów."
                     return None
                     
                 with open(source, 'rb') as f:
                     return f.read()
             else:
+                self.last_error = f"Nieprawidłowy URL lub plik nie istnieje: {source}"
                 return None
+        except requests.exceptions.Timeout:
+            print(f"Timeout podczas pobierania: {source}")
+            self.last_error = f"Przekroczono czas oczekiwania na odpowiedź serwera (timeout: {Config.REQUEST_TIMEOUT}s)"
+            return None
+        except requests.exceptions.ConnectionError:
+            print(f"Błąd połączenia: {source}")
+            self.last_error = "Nie można nawiązać połączenia z serwerem. Sprawdź URL i połączenie internetowe."
+            return None
+        except requests.exceptions.HTTPError as e:
+            print(f"Błąd HTTP: {e}")
+            self.last_error = f"Błąd HTTP: {e.response.status_code} - {e.response.reason}"
+            return None
         except requests.exceptions.RequestException as e:
             print(f"Błąd sieciowy: {e}")
+            self.last_error = f"Błąd podczas pobierania pliku: {str(e)}"
             return None
         except Exception as e:
             print(f"Nieoczekiwany błąd: {e}")
+            self.last_error = f"Nieoczekiwany błąd: {str(e)}"
             return None
 
     def parse_xml_feed(self, xml_content):
@@ -145,13 +165,22 @@ class XMLFeedComparator:
     def get_all_attributes(self):
         """Pobiera wszystkie unikalne atrybuty z pierwszego produktu każdego feeda"""
         content1 = self._get_xml_content(self.source1)
+        if content1 is None:
+            error_msg = f"Pierwszy plik XML - {self.last_error}" if self.last_error else "Nie udało się pobrać pierwszego pliku XML. Sprawdź URL i dostępność pliku."
+            return None, error_msg
+            
         content2 = self._get_xml_content(self.source2)
-
-        if content1 is None or content2 is None:
-            return None, None
+        if content2 is None:
+            error_msg = f"Drugi plik XML - {self.last_error}" if self.last_error else "Nie udało się pobrać drugiego pliku XML. Sprawdź URL i dostępność pliku."
+            return None, error_msg
 
         self.feed1_data = self.parse_xml_feed(content1)
         self.feed2_data = self.parse_xml_feed(content2)
+        
+        if not self.feed1_data:
+            return None, "Pierwszy plik XML nie zawiera żadnych produktów lub ma nieprawidłowy format."
+        if not self.feed2_data:
+            return None, "Drugi plik XML nie zawiera żadnych produktów lub ma nieprawidłowy format."
         
         all_attributes = set()
         
@@ -175,13 +204,18 @@ class XMLFeedComparator:
             excluded_attributes = []
             
         content1 = self._get_xml_content(self.source1)
+        if content1 is None:
+            return None
+            
         content2 = self._get_xml_content(self.source2)
-
-        if content1 is None or content2 is None:
+        if content2 is None:
             return None
 
         self.feed1_data = self.parse_xml_feed(content1)
         self.feed2_data = self.parse_xml_feed(content2)
+        
+        if not self.feed1_data or not self.feed2_data:
+            return None
         
         only_in_feed1 = set(self.feed1_data.keys()) - set(self.feed2_data.keys())
         only_in_feed2 = set(self.feed2_data.keys()) - set(self.feed1_data.keys())
@@ -321,18 +355,20 @@ def analyze():
     session['last_feed2'] = feed2_url
 
     if not feed1_url or not feed2_url:
-        return render_template('index.html', error="Proszę podać oba adresy URL.")
+        return render_template('index.html', error="Proszę podać oba adresy URL.", last_feed1=feed1_url, last_feed2=feed2_url)
     
     comparator = XMLFeedComparator(feed1_url, feed2_url)
-    attributes, feed_info = comparator.get_all_attributes()
+    attributes, feed_info_or_error = comparator.get_all_attributes()
 
-    if attributes is None or feed_info is None:
-        return render_template('index.html', error="Nie udało się przetworzyć plików. Sprawdź adresy URL i format XML.")
+    if attributes is None:
+        # feed_info_or_error zawiera komunikat błędu
+        error_message = feed_info_or_error if isinstance(feed_info_or_error, str) else "Nie udało się przetworzyć plików. Sprawdź adresy URL i format XML."
+        return render_template('index.html', error=error_message, last_feed1=feed1_url, last_feed2=feed2_url)
 
     return render_template(
         'select_attributes.html',
         attributes=attributes,
-        feed_info=feed_info,
+        feed_info=feed_info_or_error,
         feed1_url=feed1_url,
         feed2_url=feed2_url
     )
@@ -356,14 +392,15 @@ def compare():
     session['excluded_attributes'] = excluded_attributes
 
     if not feed1_url or not feed2_url:
-        return render_template('index.html', error="Proszę podać oba adresy URL.")
+        return render_template('index.html', error="Proszę podać oba adresy URL.", last_feed1=feed1_url, last_feed2=feed2_url)
     
     comparator = XMLFeedComparator(feed1_url, feed2_url)
     results = comparator.compare_feeds(excluded_attributes)
 
     if results is None:
         print("❌ Błąd: results jest None!")
-        return render_template('index.html', error="Nie udało się przetworzyć plików. Sprawdź adresy URL i format XML.")
+        error_msg = f"Błąd: {comparator.last_error}" if comparator.last_error else "Nie udało się przetworzyć plików. Sprawdź adresy URL i format XML."
+        return render_template('index.html', error=error_msg, last_feed1=feed1_url, last_feed2=feed2_url)
 
     print(f"✅ Porównanie zakończone:")
     print(f"   Produkty z różnicami: {results['diff_products_total']}")
