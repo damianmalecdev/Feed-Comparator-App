@@ -220,6 +220,26 @@
 
         <h2>Szczegółowe Różnice</h2>
         {% if results['differences'] %}
+            {# Zbierz unikalne atrybuty z listy różnic #}
+            {% set unique_attrs = results['differences'] | map(attribute='Pole') | list | unique | sort %}
+
+            {# Panel filtrów atrybutów #}
+            <div style="background-color:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding:16px;margin:16px 0;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+                    <div style="font-weight:600;color:#495057;">Filtruj po atrybutach</div>
+                    <div style="color:#6c757d;font-size:14px;">Wyświetlono <span id="visibleCount">0</span> z <span id="totalCount">{{ results['differences']|length }}</span> różnic</div>
+                    <button type="button" id="toggleAllBtn" onclick="toggleAllFilters()" class="btn" style="background:#6c757d;">Zaznacz/Odznacz wszystkie</button>
+                </div>
+                <div style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;max-height:220px;overflow:auto;border-top:1px solid #e9ecef;padding-top:12px;">
+                    {% for attr in unique_attrs %}
+                    <label style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #e9ecef;border-radius:6px;padding:8px 10px;font-size:14px;">
+                        <input type="checkbox" name="attrFilter" value="{{ attr }}" checked onchange="filterDifferences()">
+                        <span style="color:#495057;">{{ attr }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
             <div class="table-wrapper">
                 <table class="results-table">
                     <thead>
@@ -232,7 +252,7 @@
                     </thead>
                     <tbody>
                         {% for diff in results['differences'] %}
-                        <tr>
+                        <tr data-attribute="{{ diff['Pole'] }}">
                             <td>{{ diff['Product ID'] }}</td>
                             <td>{{ diff['Pole'] }}</td>
                             <td>{{ diff['Wartość Feed 1'] }}</td>
@@ -242,6 +262,33 @@
                     </tbody>
                 </table>
             </div>
+            <script>
+                function filterDifferences() {
+                    const checked = Array.from(document.querySelectorAll('input[name="attrFilter"]:checked')).map(cb => cb.value);
+                    const rows = document.querySelectorAll('table.results-table tbody tr');
+                    let visible = 0;
+                    rows.forEach(row => {
+                        const attr = row.getAttribute('data-attribute');
+                        const show = checked.length === 0 ? false : checked.includes(attr);
+                        row.style.display = show ? '' : 'none';
+                        if (show) visible += 1;
+                    });
+                    document.getElementById('visibleCount').textContent = visible;
+                }
+
+                function toggleAllFilters() {
+                    const boxes = Array.from(document.querySelectorAll('input[name="attrFilter"]'));
+                    const allChecked = boxes.every(cb => cb.checked);
+                    boxes.forEach(cb => cb.checked = !allChecked);
+                    filterDifferences();
+                }
+
+                // Inicjalizacja po załadowaniu: ustaw licznik i filtr
+                document.addEventListener('DOMContentLoaded', () => {
+                    // Ustaw całkowitą liczbę (już wyrenderowana przez Jinja w #totalCount)
+                    filterDifferences();
+                });
+            </script>
         {% else %}
             <p class="no-diff">Brak różnic w polach wspólnych produktów.</p>
         {% endif %}
