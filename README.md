@@ -72,8 +72,8 @@ SECRET_KEY=twoj-wygenerowany-sekretny-klucz-tutaj
 # Pozostaw puste aby zezwolić na wszystkie domeny (nie zalecane dla produkcji)
 ALLOWED_DOMAINS=cropink.com,dataoctopus.io,trusted-domain.com
 
-# OPTIONAL: Maksymalny rozmiar pliku XML w bajtach (domyślnie: 10MB)
-MAX_XML_SIZE=10485760
+# OPTIONAL: Maksymalny rozmiar pliku XML w bajtach (domyślnie: 2GB)
+MAX_XML_SIZE=2147483648
 
 # OPTIONAL: Timeout dla żądań HTTP w sekundach (domyślnie: 30)
 REQUEST_TIMEOUT=30

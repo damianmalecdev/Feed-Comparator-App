@@ -19,8 +19,8 @@ class Config:
     # Leave empty to allow all domains (not recommended for production)
     ALLOWED_DOMAINS = [d.strip() for d in os.getenv('ALLOWED_DOMAINS', '').split(',') if d.strip()]
     
-    # Maximum XML file size in bytes (default: 10MB)
-    MAX_XML_SIZE = int(os.getenv('MAX_XML_SIZE', 10485760))
+    # Maximum XML file size in bytes (default: 2GB)
+    MAX_XML_SIZE = int(os.getenv('MAX_XML_SIZE', 2147483648))
     
     # Request timeout in seconds for fetching XML feeds
     REQUEST_TIMEOUT = int(os.getenv('REQUEST_TIMEOUT', 30))
